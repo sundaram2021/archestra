@@ -21,6 +21,16 @@ import packageJson from "../../package.json";
 
 type ProcessType = "web" | "worker" | "all";
 
+export type AnthropicWorkloadIdentityConfig = {
+  enabled: boolean;
+  federationRuleId: string;
+  organizationId: string;
+  serviceAccountId: string;
+  workspaceId?: string;
+  identityTokenFile?: string;
+  identityToken?: string;
+};
+
 /**
  * Load .env from platform root
  *
@@ -40,6 +50,15 @@ const frontendBaseUrl =
   process.env.ARCHESTRA_FRONTEND_URL?.trim() || "http://localhost:3000";
 const DEFAULT_POSTHOG_KEY = "phc_FFZO7LacnsvX2exKFWehLDAVaXLBfoBaJypdOuYoTk7";
 const DEFAULT_POSTHOG_HOST = "https://eu.i.posthog.com";
+
+const ANTHROPIC_WIF_ENV_VARS = {
+  federationRuleId: "ARCHESTRA_ANTHROPIC_FEDERATION_RULE_ID",
+  organizationId: "ARCHESTRA_ANTHROPIC_ORGANIZATION_ID",
+  serviceAccountId: "ARCHESTRA_ANTHROPIC_SERVICE_ACCOUNT_ID",
+  workspaceId: "ARCHESTRA_ANTHROPIC_WORKSPACE_ID",
+  identityTokenFile: "ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN_FILE",
+  identityToken: "ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN",
+} as const;
 
 /**
  * Determines OTLP authentication headers based on environment variables
@@ -491,6 +510,110 @@ export const getAnalyticsConfig = () => ({
   },
 });
 
+/** @public - exported for testability */
+export function parseAnthropicWorkloadIdentityConfig(
+  env: NodeJS.ProcessEnv,
+): AnthropicWorkloadIdentityConfig {
+  const federationRuleId =
+    env[ANTHROPIC_WIF_ENV_VARS.federationRuleId]?.trim() ?? "";
+  const organizationId =
+    env[ANTHROPIC_WIF_ENV_VARS.organizationId]?.trim() ?? "";
+  const serviceAccountId =
+    env[ANTHROPIC_WIF_ENV_VARS.serviceAccountId]?.trim() ?? "";
+  const workspaceId =
+    env[ANTHROPIC_WIF_ENV_VARS.workspaceId]?.trim() || undefined;
+  const identityTokenFile =
+    env[ANTHROPIC_WIF_ENV_VARS.identityTokenFile]?.trim() || undefined;
+  const identityToken =
+    env[ANTHROPIC_WIF_ENV_VARS.identityToken]?.trim() || undefined;
+
+  const hasAnyWifConfig = Boolean(
+    federationRuleId ||
+      organizationId ||
+      serviceAccountId ||
+      workspaceId ||
+      identityTokenFile ||
+      identityToken,
+  );
+
+  if (!hasAnyWifConfig) {
+    return {
+      enabled: false,
+      federationRuleId: "",
+      organizationId: "",
+      serviceAccountId: "",
+    };
+  }
+
+  const missing: string[] = [];
+  if (!federationRuleId) {
+    missing.push(ANTHROPIC_WIF_ENV_VARS.federationRuleId);
+  }
+  if (!organizationId) {
+    missing.push(ANTHROPIC_WIF_ENV_VARS.organizationId);
+  }
+  if (!serviceAccountId) {
+    missing.push(ANTHROPIC_WIF_ENV_VARS.serviceAccountId);
+  }
+  if (!identityTokenFile && !identityToken) {
+    missing.push(
+      `${ANTHROPIC_WIF_ENV_VARS.identityTokenFile} or ${ANTHROPIC_WIF_ENV_VARS.identityToken}`,
+    );
+  }
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Anthropic Workload Identity Federation is misconfigured. Missing required environment variables: ${missing.join(", ")}`,
+    );
+  }
+
+  if (identityTokenFile && identityToken) {
+    throw new Error(
+      `Anthropic Workload Identity Federation is misconfigured. Set only one of ${ANTHROPIC_WIF_ENV_VARS.identityTokenFile} or ${ANTHROPIC_WIF_ENV_VARS.identityToken}.`,
+    );
+  }
+
+  return {
+    enabled: true,
+    federationRuleId,
+    organizationId,
+    serviceAccountId,
+    workspaceId,
+    identityTokenFile,
+    identityToken,
+  };
+}
+
+/** @public - exported for testability */
+export function assertAnthropicKeylessAuthModesCompatible(
+  workloadIdentity: Pick<AnthropicWorkloadIdentityConfig, "enabled">,
+  azureFoundryEntraIdEnabled: boolean,
+): void {
+  if (workloadIdentity.enabled && azureFoundryEntraIdEnabled) {
+    throw new Error(
+      "Anthropic Workload Identity Federation cannot be enabled together with ARCHESTRA_ANTHROPIC_AZURE_FOUNDRY_ENTRA_ID_ENABLED.",
+    );
+  }
+}
+
+function getAnthropicConfig() {
+  const workloadIdentity = parseAnthropicWorkloadIdentityConfig(process.env);
+  const azureFoundryEntraIdEnabled =
+    process.env.ARCHESTRA_ANTHROPIC_AZURE_FOUNDRY_ENTRA_ID_ENABLED === "true";
+
+  assertAnthropicKeylessAuthModesCompatible(
+    workloadIdentity,
+    azureFoundryEntraIdEnabled,
+  );
+
+  return {
+    baseUrl:
+      process.env.ARCHESTRA_ANTHROPIC_BASE_URL || "https://api.anthropic.com",
+    azureFoundryEntraIdEnabled,
+    workloadIdentity,
+  };
+}
+
 const config = {
   frontendBaseUrl,
   api: {
@@ -582,11 +705,7 @@ const config = {
       title: process.env.ARCHESTRA_OPENROUTER_TITLE || DEFAULT_APP_NAME,
     },
     anthropic: {
-      baseUrl:
-        process.env.ARCHESTRA_ANTHROPIC_BASE_URL || "https://api.anthropic.com",
-      azureFoundryEntraIdEnabled:
-        process.env.ARCHESTRA_ANTHROPIC_AZURE_FOUNDRY_ENTRA_ID_ENABLED ===
-        "true",
+      ...getAnthropicConfig(),
     },
     gemini: {
       baseUrl:

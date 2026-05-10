@@ -8,6 +8,7 @@ import {
   test,
 } from "@/test";
 import {
+  assertAnthropicKeylessAuthModesCompatible,
   getAnalyticsConfig,
   getCorsOrigins,
   getDatabaseUrl,
@@ -15,6 +16,7 @@ import {
   getOtelExporterOtlpLogEndpoint,
   getOtlpAuthHeaders,
   getTrustedOrigins,
+  parseAnthropicWorkloadIdentityConfig,
   parseBodyLimit,
   parseCommaSeparatedList,
   parseConnectorSyncMaxDuration,
@@ -1109,6 +1111,85 @@ describe("parseCommaSeparatedList", () => {
 
   test("should handle single value", () => {
     expect(parseCommaSeparatedList("anthropic")).toEqual(["anthropic"]);
+  });
+});
+
+describe("parseAnthropicWorkloadIdentityConfig", () => {
+  test("returns disabled config when no WIF variables are set", () => {
+    expect(parseAnthropicWorkloadIdentityConfig({})).toEqual({
+      enabled: false,
+      federationRuleId: "",
+      organizationId: "",
+      serviceAccountId: "",
+    });
+  });
+
+  test("parses valid token-file configuration", () => {
+    expect(
+      parseAnthropicWorkloadIdentityConfig({
+        ARCHESTRA_ANTHROPIC_FEDERATION_RULE_ID: " fdrl_test ",
+        ARCHESTRA_ANTHROPIC_ORGANIZATION_ID: " org_test ",
+        ARCHESTRA_ANTHROPIC_SERVICE_ACCOUNT_ID: " svac_test ",
+        ARCHESTRA_ANTHROPIC_WORKSPACE_ID: " wrkspc_test ",
+        ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN_FILE:
+          " /var/run/secrets/anthropic/token ",
+      }),
+    ).toEqual({
+      enabled: true,
+      federationRuleId: "fdrl_test",
+      organizationId: "org_test",
+      serviceAccountId: "svac_test",
+      workspaceId: "wrkspc_test",
+      identityTokenFile: "/var/run/secrets/anthropic/token",
+      identityToken: undefined,
+    });
+  });
+
+  test("parses valid inline token configuration", () => {
+    expect(
+      parseAnthropicWorkloadIdentityConfig({
+        ARCHESTRA_ANTHROPIC_FEDERATION_RULE_ID: "fdrl_test",
+        ARCHESTRA_ANTHROPIC_ORGANIZATION_ID: "org_test",
+        ARCHESTRA_ANTHROPIC_SERVICE_ACCOUNT_ID: "svac_test",
+        ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN: "jwt-from-idp",
+      }),
+    ).toMatchObject({
+      enabled: true,
+      identityToken: "jwt-from-idp",
+      identityTokenFile: undefined,
+    });
+  });
+
+  test("throws on partial configuration", () => {
+    expect(() =>
+      parseAnthropicWorkloadIdentityConfig({
+        ARCHESTRA_ANTHROPIC_FEDERATION_RULE_ID: "fdrl_test",
+      }),
+    ).toThrow(
+      "Missing required environment variables: ARCHESTRA_ANTHROPIC_ORGANIZATION_ID, ARCHESTRA_ANTHROPIC_SERVICE_ACCOUNT_ID, ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN_FILE or ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN",
+    );
+  });
+
+  test("throws when both token sources are set", () => {
+    expect(() =>
+      parseAnthropicWorkloadIdentityConfig({
+        ARCHESTRA_ANTHROPIC_FEDERATION_RULE_ID: "fdrl_test",
+        ARCHESTRA_ANTHROPIC_ORGANIZATION_ID: "org_test",
+        ARCHESTRA_ANTHROPIC_SERVICE_ACCOUNT_ID: "svac_test",
+        ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN_FILE: "/token",
+        ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN: "jwt-from-idp",
+      }),
+    ).toThrow(
+      "Set only one of ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN_FILE or ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN",
+    );
+  });
+
+  test("throws when WIF and Azure Foundry Entra ID are both enabled", () => {
+    expect(() =>
+      assertAnthropicKeylessAuthModesCompatible({ enabled: true }, true),
+    ).toThrow(
+      "Anthropic Workload Identity Federation cannot be enabled together with ARCHESTRA_ANTHROPIC_AZURE_FOUNDRY_ENTRA_ID_ENABLED",
+    );
   });
 });
 
