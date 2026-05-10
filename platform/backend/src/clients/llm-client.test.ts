@@ -439,6 +439,32 @@ describe("createDirectLLMModel", () => {
 });
 
 describe("createLLMModel", () => {
+  test("passes an empty Anthropic API key for proxied keyless calls", () => {
+    mockCreateAnthropic.mockClear();
+
+    createLLMModel({
+      provider: "anthropic",
+      apiKey: undefined,
+      agentId: "agent-1",
+      modelName: "claude-3-5-haiku-20241022",
+      userId: "user-1",
+      source: "chat",
+      baseUrl: null,
+      contextIsTrusted: true,
+      chatApiKeyId: "system-key-id",
+    });
+
+    expect(mockCreateAnthropic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        apiKey: "",
+        baseURL: "http://127.0.0.1:9000/v1/anthropic/agent-1/v1",
+        headers: expect.objectContaining({
+          [USER_ID_HEADER]: "user-1",
+        }),
+      }),
+    );
+  });
+
   test("sets the untrusted-context header only when contextIsTrusted is false", () => {
     createLLMModel({
       provider: "anthropic",

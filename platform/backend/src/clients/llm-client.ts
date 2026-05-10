@@ -21,6 +21,8 @@ import {
   USER_ID_HEADER,
 } from "@shared";
 import type { streamText } from "ai";
+import { isAnthropicWorkloadIdentityEnabled } from "@/clients/anthropic-workload-identity";
+import { isAnthropicAzureFoundryEntraIdEnabled } from "@/clients/azure-openai-credentials";
 import {
   createAzureFetchWithApiVersion,
   normalizeAzureApiKey,
@@ -286,6 +288,11 @@ export async function createLLMModelForAgent(params: {
   // Check if Bedrock with IAM auth (doesn't require API key)
   const isBedrockWithIamAuth =
     provider === "bedrock" && isBedrockIamAuthEnabled();
+  // Anthropic keyless modes authenticate inside the proxy adapter.
+  const isAnthropicWithKeylessAuth =
+    provider === "anthropic" &&
+    (isAnthropicWorkloadIdentityEnabled() ||
+      isAnthropicAzureFoundryEntraIdEnabled());
   // vLLM and Ollama typically don't require API keys
   const isVllm = provider === "vllm";
   const isOllama = provider === "ollama";
@@ -296,6 +303,7 @@ export async function createLLMModelForAgent(params: {
       provider,
       isGeminiWithVertexAi,
       isBedrockWithIamAuth,
+      isAnthropicWithKeylessAuth,
       isVllm,
       isOllama,
     },
@@ -306,6 +314,7 @@ export async function createLLMModelForAgent(params: {
     !apiKey &&
     !isGeminiWithVertexAi &&
     !isBedrockWithIamAuth &&
+    !isAnthropicWithKeylessAuth &&
     !isVllm &&
     !isOllama
   ) {
@@ -370,7 +379,12 @@ const providerModelConfigs: Record<SupportedProvider, ProviderModelConfig> = {
 
   anthropic: {
     createModel: ({ apiKey, modelName, baseURL, headers, fetch }) =>
-      createAnthropic({ apiKey, baseURL, headers, fetch })(modelName),
+      createAnthropic({
+        apiKey: apiKey ?? (headers || fetch ? "" : undefined),
+        baseURL,
+        headers,
+        fetch,
+      })(modelName),
     defaultBaseUrl: config.llm.anthropic.baseUrl,
     apiKeyRequiredMessage:
       "Anthropic API key is required. Please configure ANTHROPIC_API_KEY.",
@@ -620,5 +634,5 @@ function createTracedFetch(): typeof globalThis.fetch {
  * Build the proxy base URL for a provider
  */
 function buildProxyBaseUrl(provider: string, agentId: string): string {
-  return `http://localhost:${config.api.port}/v1/${provider}/${agentId}`;
+  return `http://127.0.0.1:${config.api.port}/v1/${provider}/${agentId}`;
 }

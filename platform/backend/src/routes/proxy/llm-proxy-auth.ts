@@ -301,9 +301,10 @@ export async function attemptJwksAuth(
 // =========================================================================
 
 /**
- * For keyless providers (Ollama, vLLM, Vertex AI Gemini), ensure the request
- * was authenticated via a virtual API key or JWKS. Without this, anyone who
- * knows the proxy URL could call the endpoint without credentials.
+ * For keyless providers (Ollama, vLLM, Vertex AI Gemini, Anthropic WIF, etc.),
+ * ensure the request was authenticated via a virtual API key or JWKS. Without
+ * this, anyone who knows the proxy URL could call the endpoint without
+ * credentials.
  *
  * Internal requests from localhost (chat route → proxy) are allowed.
  */
