@@ -40,6 +40,8 @@ export const CacheKey = {
   SlackScopeNotification: "slack-scope-notification",
   /** Organization-scoped settings cache */
   OrganizationSettings: "organization-settings",
+  /** Short-lived Anthropic Workload Identity Federation access tokens */
+  AnthropicWifAccessToken: "anthropic-wif-access-token",
 } as const;
 
 export type CacheKeyPrefix = (typeof CacheKey)[keyof typeof CacheKey];
