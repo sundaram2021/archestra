@@ -47,11 +47,11 @@ export async function resolveProviderApiKey(params: {
       agentLlmApiKeyId,
     });
   } else {
-    resolvedApiKey = await LlmProviderApiKeyModel.findByScope(
-      organizationId,
-      provider,
-      "org",
-    );
+    resolvedApiKey =
+      await LlmProviderApiKeyModel.findBestOrgKeyOrSystemFallback({
+        organizationId,
+        provider,
+      });
   }
 
   if (resolvedApiKey) {

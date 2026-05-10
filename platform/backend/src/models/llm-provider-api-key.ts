@@ -420,10 +420,9 @@ class LlmProviderApiKeyModel {
       }
     }
 
-    // Condition: key has a secret, is system-managed, or provider allows optional API keys
+    // Condition: key has a secret or provider allows optional API keys
     const hasSecretOrOptional = or(
       sql`${schema.llmProviderApiKeysTable.secretId} IS NOT NULL`,
-      eq(schema.llmProviderApiKeysTable.isSystem, true),
       inArray(
         schema.llmProviderApiKeysTable.provider,
         getProvidersWithOptionalApiKey({
@@ -480,7 +479,30 @@ class LlmProviderApiKeyModel {
       }
     }
 
-    // 5. Try org-wide key (prefer isPrimary, then oldest)
+    // 5. Try org-wide key, then the system key as a controlled fallback
+    return LlmProviderApiKeyModel.findBestOrgKeyOrSystemFallback({
+      organizationId,
+      provider,
+    });
+  }
+
+  static async findBestOrgKeyOrSystemFallback({
+    organizationId,
+    provider,
+  }: {
+    organizationId: string;
+    provider: SupportedProvider;
+  }): Promise<LlmProviderApiKey | null> {
+    const hasSecretOrOptional = or(
+      sql`${schema.llmProviderApiKeysTable.secretId} IS NOT NULL`,
+      inArray(
+        schema.llmProviderApiKeysTable.provider,
+        getProvidersWithOptionalApiKey({
+          azureEntraIdEnabled: isAzureOpenAiEntraIdEnabled(),
+        }),
+      ),
+    );
+
     const [orgWideKey] = await db
       .select()
       .from(schema.llmProviderApiKeysTable)
@@ -498,7 +520,10 @@ class LlmProviderApiKeyModel {
       )
       .limit(1);
 
-    return orgWideKey ?? null;
+    return (
+      orgWideKey ??
+      LlmProviderApiKeyModel.findSystemKey(provider, organizationId)
+    );
   }
 
   /**
@@ -635,16 +660,23 @@ class LlmProviderApiKeyModel {
    */
   static async findSystemKey(
     provider: SupportedProvider,
+    organizationId?: string,
   ): Promise<LlmProviderApiKey | null> {
+    const conditions = [
+      eq(schema.llmProviderApiKeysTable.provider, provider),
+      eq(schema.llmProviderApiKeysTable.isSystem, true),
+    ];
+
+    if (organizationId) {
+      conditions.push(
+        eq(schema.llmProviderApiKeysTable.organizationId, organizationId),
+      );
+    }
+
     const [result] = await db
       .select()
       .from(schema.llmProviderApiKeysTable)
-      .where(
-        and(
-          eq(schema.llmProviderApiKeysTable.provider, provider),
-          eq(schema.llmProviderApiKeysTable.isSystem, true),
-        ),
-      )
+      .where(and(...conditions))
       .limit(1);
 
     return result ?? null;

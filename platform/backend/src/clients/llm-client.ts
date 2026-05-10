@@ -25,6 +25,7 @@ import { isAnthropicWorkloadIdentityEnabled } from "@/clients/anthropic-workload
 import { isAnthropicAzureFoundryEntraIdEnabled } from "@/clients/azure-openai-credentials";
 import {
   createAzureFetchWithApiVersion,
+  isAzureAiFoundryBaseUrl,
   normalizeAzureApiKey,
 } from "@/clients/azure-url";
 import {
@@ -292,7 +293,8 @@ export async function createLLMModelForAgent(params: {
   const isAnthropicWithKeylessAuth =
     provider === "anthropic" &&
     (isAnthropicWorkloadIdentityEnabled() ||
-      isAnthropicAzureFoundryEntraIdEnabled());
+      (isAnthropicAzureFoundryEntraIdEnabled() &&
+        isAzureAiFoundryBaseUrl(config.llm.anthropic.baseUrl)));
   // vLLM and Ollama typically don't require API keys
   const isVllm = provider === "vllm";
   const isOllama = provider === "ollama";
