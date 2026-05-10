@@ -74,6 +74,21 @@ Model Router translation is text-first. Anthropic, Gemini, and Cohere routes cur
 - **Authentication**: Pass your Anthropic API key in the `x-api-key` header
 - **Messages path**: `POST /v1/anthropic/{profile-id}/v1/messages`
 
+### Anthropic Workload Identity Federation
+
+Anthropic Workload Identity Federation lets Archestra use short-lived Anthropic access tokens instead of storing a static Anthropic API key. Configure the Anthropic federation rule, organization, service account, and exactly one identity token source in the platform environment.
+
+Required variables are documented in [LLM Provider Configuration](/docs/platform-deployment#llm-provider-configuration):
+
+- `ARCHESTRA_ANTHROPIC_FEDERATION_RULE_ID`
+- `ARCHESTRA_ANTHROPIC_ORGANIZATION_ID`
+- `ARCHESTRA_ANTHROPIC_SERVICE_ACCOUNT_ID`
+- `ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN_FILE` or `ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN`
+
+`ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN_FILE` is preferred for Kubernetes deployments because the identity provider can rotate the projected token file. With the Helm chart, enable `archestra.anthropic.workloadIdentity.enabled=true` to project the token and set the Archestra `ARCHESTRA_ANTHROPIC_*` variables plus Anthropic's standard `ANTHROPIC_*` WIF variables automatically. Do not enable Anthropic Workload Identity Federation together with `ARCHESTRA_ANTHROPIC_AZURE_FOUNDRY_ENTRA_ID_ENABLED`.
+
+See Anthropic's [Workload Identity Federation guide](https://platform.claude.com/docs/en/manage-claude/workload-identity-federation), [Kubernetes provider guide](https://platform.claude.com/docs/en/manage-claude/wif-providers/kubernetes), and [WIF reference](https://platform.claude.com/docs/en/manage-claude/wif-reference) for Anthropic-side setup.
+
 ### Anthropic on Microsoft Foundry
 
 Claude models deployed in Microsoft Foundry use the Anthropic Messages API at `https://<resource>.services.ai.azure.com/anthropic`. Set `ARCHESTRA_ANTHROPIC_BASE_URL` to that `/anthropic` base URL. For keyless Microsoft Entra ID authentication, also set `ARCHESTRA_ANTHROPIC_AZURE_FOUNDRY_ENTRA_ID_ENABLED=true`; Archestra sends a bearer token scoped to `https://ai.azure.com/.default`.
