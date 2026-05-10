@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+import { isAnthropicWorkloadIdentityEnabled } from "@/clients/anthropic-workload-identity";
 import { isVertexAiEnabled } from "@/clients/gemini-client";
 import LlmProviderApiKeyModel from "@/models/llm-provider-api-key";
 import LlmProviderApiKeyModelLinkModel from "@/models/llm-provider-api-key-model";
@@ -14,6 +15,15 @@ import { syncModelsForVisibleApiKeys } from "./llm-provider-models";
 
 vi.mock("@/clients/gemini-client", () => ({
   isVertexAiEnabled: vi.fn(() => false),
+}));
+
+vi.mock("@/clients/azure-openai-credentials", () => ({
+  isAnthropicAzureFoundryEntraIdEnabled: vi.fn(() => false),
+  isAzureOpenAiEntraIdEnabled: vi.fn(() => false),
+}));
+
+vi.mock("@/clients/anthropic-workload-identity", () => ({
+  isAnthropicWorkloadIdentityEnabled: vi.fn(() => false),
 }));
 
 vi.mock("@/clients/bedrock-credentials", () => ({
@@ -50,6 +60,9 @@ const mockGetSecretValueForLlmProviderApiKey = vi.mocked(
   getSecretValueForLlmProviderApiKey,
 );
 const mockIsVertexAiEnabled = vi.mocked(isVertexAiEnabled);
+const mockIsAnthropicWorkloadIdentityEnabled = vi.mocked(
+  isAnthropicWorkloadIdentityEnabled,
+);
 const mockSyncSystemKeys = vi.mocked(systemKeyManager.syncSystemKeys);
 
 describe("chat model routes", () => {
@@ -60,6 +73,7 @@ describe("chat model routes", () => {
   beforeEach(async ({ makeOrganization, makeUser, makeMember }) => {
     vi.clearAllMocks();
     mockIsVertexAiEnabled.mockReturnValue(false);
+    mockIsAnthropicWorkloadIdentityEnabled.mockReturnValue(false);
 
     const organization = await makeOrganization();
     organizationId = organization.id;
@@ -326,6 +340,28 @@ describe("chat model routes", () => {
       organizationId,
       name: "Vertex AI",
       provider: "gemini",
+    });
+
+    await syncModelsForVisibleApiKeys({
+      organizationId,
+      userId: user.id,
+    });
+
+    expect(mockSyncSystemKeys).toHaveBeenCalledWith(organizationId);
+    expect(syncSpy).not.toHaveBeenCalled();
+  });
+
+  test("syncModelsForVisibleApiKeys delegates Anthropic WIF system keys to system key sync", async () => {
+    mockIsAnthropicWorkloadIdentityEnabled.mockReturnValue(true);
+
+    const syncSpy = vi
+      .spyOn(modelSyncService, "syncModelsForApiKey")
+      .mockResolvedValue(1);
+
+    await LlmProviderApiKeyModel.createSystemKey({
+      organizationId,
+      name: "Anthropic Workload Identity Federation",
+      provider: "anthropic",
     });
 
     await syncModelsForVisibleApiKeys({

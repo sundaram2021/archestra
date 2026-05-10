@@ -753,10 +753,13 @@ const startWebServer = async () => {
   try {
     // Initialize database connection first
     await initializeDatabase();
+    // Start the distributed cache before system-key sync so keyless provider
+    // model discovery can cache short-lived provider access tokens.
+    cacheManager.start();
 
     await seedRequiredStartingData();
 
-    // Sync system API keys for keyless providers (Vertex AI, vLLM, Ollama, Bedrock)
+    // Sync system API keys for keyless providers (Vertex AI, Azure OpenAI, Anthropic, Bedrock)
     const defaultOrg = await OrganizationModel.getFirst();
     if (defaultOrg) {
       await systemKeyManager.syncSystemKeys(defaultOrg.id).catch((error) => {
@@ -766,9 +769,6 @@ const startWebServer = async () => {
         );
       });
     }
-
-    // Start cache manager's background cleanup interval
-    cacheManager.start();
 
     // Initialize metrics with keys of custom agent labels
     // Set OpenMetrics content type to enable exemplar support on histograms

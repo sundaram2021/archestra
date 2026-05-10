@@ -6,10 +6,16 @@ import {
 } from "@shared";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { isAzureOpenAiEntraIdEnabled } from "@/clients/azure-openai-credentials";
+import { isAnthropicWorkloadIdentityEnabled } from "@/clients/anthropic-workload-identity";
+import {
+  isAnthropicAzureFoundryEntraIdEnabled,
+  isAzureOpenAiEntraIdEnabled,
+} from "@/clients/azure-openai-credentials";
+import { isAzureAiFoundryBaseUrl } from "@/clients/azure-url";
 import { isBedrockIamAuthEnabled } from "@/clients/bedrock-credentials";
 import { isVertexAiEnabled } from "@/clients/gemini-client";
 import { modelsDevClient } from "@/clients/models-dev-client";
+import config from "@/config";
 import logger from "@/logging";
 import {
   LlmProviderApiKeyModel,
@@ -346,6 +352,14 @@ function shouldHandleWithSystemKeySync(apiKey: {
 
   if (apiKey.provider === "bedrock") {
     return isBedrockIamAuthEnabled();
+  }
+
+  if (apiKey.provider === "anthropic") {
+    return (
+      isAnthropicWorkloadIdentityEnabled() ||
+      (isAnthropicAzureFoundryEntraIdEnabled() &&
+        isAzureAiFoundryBaseUrl(config.llm.anthropic.baseUrl))
+    );
   }
 
   return false;

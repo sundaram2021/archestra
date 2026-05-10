@@ -32,6 +32,7 @@ export async function resolveProviderApiKey(params: {
     id: string;
     secretId: string | null;
     scope: string;
+    isSystem: boolean;
     baseUrl: string | null;
   } | null = null;
 
@@ -69,6 +70,7 @@ export async function resolveProviderApiKey(params: {
     }
 
     if (
+      resolvedApiKey.isSystem ||
       isProviderApiKeyOptional({
         provider,
         azureEntraIdEnabled: isAzureOpenAiEntraIdEnabled(),
@@ -76,7 +78,7 @@ export async function resolveProviderApiKey(params: {
     ) {
       return {
         apiKey: undefined,
-        source: resolvedApiKey.scope,
+        source: resolvedApiKey.isSystem ? "system" : resolvedApiKey.scope,
         chatApiKeyId: resolvedApiKey.id,
         baseUrl: resolvedApiKey.baseUrl,
       };

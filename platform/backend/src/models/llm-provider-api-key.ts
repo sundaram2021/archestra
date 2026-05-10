@@ -385,7 +385,7 @@ class LlmProviderApiKeyModel {
       if (
         conversationKey &&
         conversationKey.provider === provider &&
-        conversationKey.secretId
+        (conversationKey.secretId || conversationKey.isSystem)
       ) {
         // If conversation's key matches agent's configured key, skip user access check
         if (
@@ -411,14 +411,19 @@ class LlmProviderApiKeyModel {
     //    (no user permission check — permission flows through agent access)
     if (agentLlmApiKeyId) {
       const agentKey = await LlmProviderApiKeyModel.findById(agentLlmApiKeyId);
-      if (agentKey && agentKey.provider === provider && agentKey.secretId) {
+      if (
+        agentKey &&
+        agentKey.provider === provider &&
+        (agentKey.secretId || agentKey.isSystem)
+      ) {
         return agentKey;
       }
     }
 
-    // Condition: key has a secret OR provider allows optional API keys
+    // Condition: key has a secret, is system-managed, or provider allows optional API keys
     const hasSecretOrOptional = or(
       sql`${schema.llmProviderApiKeysTable.secretId} IS NOT NULL`,
+      eq(schema.llmProviderApiKeysTable.isSystem, true),
       inArray(
         schema.llmProviderApiKeysTable.provider,
         getProvidersWithOptionalApiKey({

@@ -1,4 +1,5 @@
 import type { SupportedProvider } from "@shared";
+import { isAnthropicWorkloadIdentityEnabled } from "@/clients/anthropic-workload-identity";
 import {
   isAnthropicAzureFoundryEntraIdEnabled,
   isAzureOpenAiEntraIdEnabled,
@@ -26,7 +27,7 @@ import type { CreateModel } from "@/types";
  */
 interface KeylessProviderConfig {
   provider: SupportedProvider;
-  name: string;
+  name: () => string;
   isEnabled: () => boolean;
   /** Custom fetch function for providers that need special handling (e.g., Vertex AI) */
   customFetch: () => Promise<Array<{ id: string; displayName: string }>>;
@@ -49,7 +50,7 @@ class SystemKeyManager {
   private readonly keylessProviders: KeylessProviderConfig[] = [
     {
       provider: "gemini",
-      name: "Vertex AI",
+      name: () => "Vertex AI",
       isEnabled: () => isVertexAiEnabled(),
       customFetch: async () => {
         const models = await fetchGeminiModelsViaVertexAi();
@@ -58,7 +59,7 @@ class SystemKeyManager {
     },
     {
       provider: "azure",
-      name: "Azure OpenAI Entra ID",
+      name: () => "Azure OpenAI Entra ID",
       isEnabled: () =>
         isAzureOpenAiEntraIdEnabled() && Boolean(config.llm.azure.baseUrl),
       customFetch: async () => {
@@ -68,10 +69,8 @@ class SystemKeyManager {
     },
     {
       provider: "anthropic",
-      name: "Anthropic Azure Foundry Entra ID",
-      isEnabled: () =>
-        isAnthropicAzureFoundryEntraIdEnabled() &&
-        isAzureAiFoundryBaseUrl(config.llm.anthropic.baseUrl),
+      name: () => getAnthropicKeylessAuthName(),
+      isEnabled: () => isAnthropicKeylessAuthEnabled(),
       customFetch: async () => {
         const models = await fetchAnthropicModels(
           "",
@@ -82,7 +81,7 @@ class SystemKeyManager {
     },
     {
       provider: "bedrock",
-      name: "AWS IAM",
+      name: () => "AWS IAM",
       isEnabled: () => isBedrockIamAuthEnabled(),
       customFetch: async () => {
         const models = await fetchBedrockModelsViaIam();
@@ -128,11 +127,18 @@ class SystemKeyManager {
   ): Promise<void> {
     const { provider, name, isEnabled, customFetch } = providerConfig;
     const enabled = isEnabled();
+    const systemKeyName = name();
 
     const existingKey = await LlmProviderApiKeyModel.findSystemKey(provider);
 
     if (enabled) {
       if (existingKey) {
+        if (existingKey.name !== systemKeyName) {
+          await LlmProviderApiKeyModel.update(existingKey.id, {
+            name: systemKeyName,
+          });
+        }
+
         // Key exists, sync models
         logger.debug(
           { provider, apiKeyId: existingKey.id },
@@ -148,7 +154,7 @@ class SystemKeyManager {
         logger.info({ provider, organizationId }, "Creating system API key");
         const newKey = await LlmProviderApiKeyModel.createSystemKey({
           organizationId,
-          name,
+          name: systemKeyName,
           provider,
         });
         await this.syncModelsForSystemKey(newKey.id, provider, customFetch);
@@ -260,3 +266,19 @@ class SystemKeyManager {
 
 // Export singleton instance
 export const systemKeyManager = new SystemKeyManager();
+
+function isAnthropicKeylessAuthEnabled(): boolean {
+  return (
+    isAnthropicWorkloadIdentityEnabled() ||
+    (isAnthropicAzureFoundryEntraIdEnabled() &&
+      isAzureAiFoundryBaseUrl(config.llm.anthropic.baseUrl))
+  );
+}
+
+function getAnthropicKeylessAuthName(): string {
+  if (isAnthropicWorkloadIdentityEnabled()) {
+    return "Anthropic Workload Identity Federation";
+  }
+
+  return "Anthropic Azure Foundry Entra ID";
+}

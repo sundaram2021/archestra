@@ -189,4 +189,59 @@ describe("resolveProviderApiKey", () => {
 
     expect(result.apiKey).toBe("sk-legacy-key");
   });
+
+  test("resolves Anthropic system key without a secret for a user", async ({
+    makeOrganization,
+    makeUser,
+    makeMember,
+  }) => {
+    const org = await makeOrganization();
+    const user = await makeUser();
+    await makeMember(user.id, org.id);
+
+    const { LlmProviderApiKeyModel } = await import("@/models");
+    const systemKey = await LlmProviderApiKeyModel.createSystemKey({
+      organizationId: org.id,
+      name: "Anthropic Workload Identity Federation",
+      provider: "anthropic",
+    });
+
+    const result = await resolveProviderApiKey({
+      organizationId: org.id,
+      userId: user.id,
+      provider: "anthropic",
+    });
+
+    expect(result).toEqual({
+      apiKey: undefined,
+      source: "system",
+      chatApiKeyId: systemKey.id,
+      baseUrl: null,
+    });
+  });
+
+  test("resolves Anthropic system key without a user", async ({
+    makeOrganization,
+  }) => {
+    const org = await makeOrganization();
+
+    const { LlmProviderApiKeyModel } = await import("@/models");
+    const systemKey = await LlmProviderApiKeyModel.createSystemKey({
+      organizationId: org.id,
+      name: "Anthropic Workload Identity Federation",
+      provider: "anthropic",
+    });
+
+    const result = await resolveProviderApiKey({
+      organizationId: org.id,
+      provider: "anthropic",
+    });
+
+    expect(result).toEqual({
+      apiKey: undefined,
+      source: "system",
+      chatApiKeyId: systemKey.id,
+      baseUrl: null,
+    });
+  });
 });
