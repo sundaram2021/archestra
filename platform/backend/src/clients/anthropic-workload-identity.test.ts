@@ -156,7 +156,9 @@ describe("Anthropic Workload Identity Federation", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       makeTokenResponse("wrapped-token", 3600),
     );
-    const upstreamFetch = vi.fn(async () => new Response("{}"));
+    const upstreamFetch = vi.fn<typeof globalThis.fetch>(
+      async () => new Response("{}"),
+    );
 
     const headers = await getAnthropicWorkloadIdentityAuthHeaders(
       "https://api.anthropic.com",
