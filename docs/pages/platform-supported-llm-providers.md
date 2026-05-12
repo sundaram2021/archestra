@@ -78,7 +78,7 @@ Model Router translation is text-first. Anthropic, Gemini, and Cohere routes cur
 
 Anthropic Workload Identity Federation lets Archestra use short-lived Anthropic access tokens instead of storing a static Anthropic API key. Configure the Anthropic federation rule, organization, service account, and exactly one identity token source in the platform environment.
 
-Required variables are documented in [LLM Provider Configuration](/docs/platform-deployment#llm-provider-configuration):
+Required variables are documented in [Anthropic Workload Identity Federation](/docs/platform-deployment#anthropic-workload-identity-federation):
 
 - `ARCHESTRA_ANTHROPIC_FEDERATION_RULE_ID`
 - `ARCHESTRA_ANTHROPIC_ORGANIZATION_ID`

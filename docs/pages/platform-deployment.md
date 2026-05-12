@@ -762,46 +762,6 @@ These environment variables set the default base URL for each LLM provider. Per-
   - Uses Azure Identity `DefaultAzureCredential` with token scope `https://ai.azure.com/.default`
   - Claude deployments must already exist in the Azure resource. Microsoft lists additional Claude prerequisites: paid eligible subscription, supported region, Azure Marketplace access for partner models, permission to subscribe to model offerings, and Contributor or Owner role on the resource group. Azure also requires Anthropic deployment metadata: `industry`, `organizationName`, and `countryCode`.
 
-- **`ARCHESTRA_ANTHROPIC_FEDERATION_RULE_ID`** - Anthropic Workload Identity Federation rule ID for keyless Anthropic authentication.
-  - Required when: using Anthropic Workload Identity Federation
-  - Example: `fdrl_...`
-  - Do not combine with `ARCHESTRA_ANTHROPIC_AZURE_FOUNDRY_ENTRA_ID_ENABLED=true`
-
-- **`ARCHESTRA_ANTHROPIC_ORGANIZATION_ID`** - Anthropic organization ID used for Workload Identity Federation.
-  - Required when: using Anthropic Workload Identity Federation
-
-- **`ARCHESTRA_ANTHROPIC_SERVICE_ACCOUNT_ID`** - Anthropic service account ID that receives the exchanged access token.
-  - Required when: using Anthropic Workload Identity Federation
-  - Example: `svac_...`
-
-- **`ARCHESTRA_ANTHROPIC_WORKSPACE_ID`** - Optional Anthropic workspace ID for Workload Identity Federation.
-  - Optional
-  - Example: `wrkspc_...`
-
-- **`ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN_FILE`** - File path for the OIDC identity token Archestra exchanges with Anthropic.
-  - Required when: using Anthropic Workload Identity Federation and `ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN` is not set
-  - Recommended for Kubernetes projected service account tokens
-  - With Helm, prefer `archestra.anthropic.workloadIdentity.enabled=true`; the chart mounts a projected service account token and sets this path automatically
-
-- **`ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN`** - Inline OIDC identity token Archestra exchanges with Anthropic.
-  - Required when: using Anthropic Workload Identity Federation and `ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN_FILE` is not set
-  - Use only one token source: either this variable or `ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN_FILE`
-
-Example Helm values for Kubernetes-projected Anthropic Workload Identity Federation:
-
-```yaml
-archestra:
-  anthropic:
-    workloadIdentity:
-      enabled: true
-      federationRuleId: fdrl_...
-      organizationId: 00000000-0000-0000-0000-000000000000
-      serviceAccountId: svac_...
-      workspaceId: wrkspc_...
-```
-
-The chart projects a Kubernetes service account token at `/var/run/secrets/anthropic.com/token`, sets the `ARCHESTRA_ANTHROPIC_*` variables used by Archestra, and also sets Anthropic's standard `ANTHROPIC_*` WIF variables for SDK-compatible tooling in the pod.
-
 - **`ARCHESTRA_GEMINI_BASE_URL`** - Override the Google Gemini API base URL.
   - Default: `https://generativelanguage.googleapis.com`
   - Use this to point to your own proxy or other custom endpoints
@@ -916,6 +876,48 @@ The chart projects a Kubernetes service account token at `/var/run/secrets/anthr
   - Default: `anthropic`
   - Options: `anthropic`, `openai`, `gemini`
   - Used when no profile-specific provider is configured
+
+#### Anthropic Workload Identity Federation
+
+- **`ARCHESTRA_ANTHROPIC_FEDERATION_RULE_ID`** - Anthropic Workload Identity Federation rule ID for keyless Anthropic authentication.
+  - Required when: using Anthropic Workload Identity Federation
+  - Example: `fdrl_...`
+  - Do not combine with `ARCHESTRA_ANTHROPIC_AZURE_FOUNDRY_ENTRA_ID_ENABLED=true`
+
+- **`ARCHESTRA_ANTHROPIC_ORGANIZATION_ID`** - Anthropic organization ID used for Workload Identity Federation.
+  - Required when: using Anthropic Workload Identity Federation
+
+- **`ARCHESTRA_ANTHROPIC_SERVICE_ACCOUNT_ID`** - Anthropic service account ID that receives the exchanged access token.
+  - Required when: using Anthropic Workload Identity Federation
+  - Example: `svac_...`
+
+- **`ARCHESTRA_ANTHROPIC_WORKSPACE_ID`** - Optional Anthropic workspace ID for Workload Identity Federation.
+  - Optional
+  - Example: `wrkspc_...`
+
+- **`ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN_FILE`** - File path for the OIDC identity token Archestra exchanges with Anthropic.
+  - Required when: using Anthropic Workload Identity Federation and `ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN` is not set
+  - Recommended for Kubernetes projected service account tokens
+  - With Helm, prefer `archestra.anthropic.workloadIdentity.enabled=true`; the chart mounts a projected service account token and sets this path automatically
+
+- **`ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN`** - Inline OIDC identity token Archestra exchanges with Anthropic.
+  - Required when: using Anthropic Workload Identity Federation and `ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN_FILE` is not set
+  - Use only one token source: either this variable or `ARCHESTRA_ANTHROPIC_IDENTITY_TOKEN_FILE`
+
+Example Helm values for Kubernetes-projected Anthropic Workload Identity Federation:
+
+```yaml
+archestra:
+  anthropic:
+    workloadIdentity:
+      enabled: true
+      federationRuleId: fdrl_...
+      organizationId: 00000000-0000-0000-0000-000000000000
+      serviceAccountId: svac_...
+      workspaceId: wrkspc_...
+```
+
+The chart projects a Kubernetes service account token at `/var/run/secrets/anthropic.com/token`, sets the `ARCHESTRA_ANTHROPIC_*` variables used by Archestra, and also sets Anthropic's standard `ANTHROPIC_*` WIF variables for SDK-compatible tooling in the pod.
 
 ### MCP Apps Sandbox
 
